@@ -6,6 +6,7 @@ import DeleteConfirmation from "./components/DeleteConfirmation.jsx";
 import logoImg from "./assets/logo.png";
 import AvailablePlaces from "./components/AvailablePlaces.jsx";
 import { updateUserPlaces } from "./http.js";
+import Error from "./components/Error.jsx";
 
 function App() {
   const selectedPlace = useRef();
@@ -13,6 +14,7 @@ function App() {
   const [userPlaces, setUserPlaces] = useState([]);
 
   const [modalIsOpen, setModalIsOpen] = useState(false);
+  const [errorUpdatingPlaces, setErrorUpdatingPlaces] = useState();
 
   function handleStartRemovePlace(place) {
     setModalIsOpen(true);
@@ -24,6 +26,9 @@ function App() {
   }
 
   async function handleSelectPlace(selectedPlace) {
+    // another method this will need a loading because of the await
+    // await updateUserPlaces([selectedPlace, ...userPlaces]);
+
     setUserPlaces((prevPickedPlaces) => {
       if (!prevPickedPlaces) {
         prevPickedPlaces = [];
@@ -36,7 +41,18 @@ function App() {
     try {
       // here we use this instead of userPlaces because userPlaces might be outdated for a second
       await updateUserPlaces([selectedPlace, ...userPlaces]);
-    } catch (error) {}
+    } catch (error) {
+      // as the previous comment mention
+      // because the userPlaces does not update
+      // until nextime calling the data is still old
+      // so if the put function return an error
+      // hence we do a rollback of data in state also
+      // this usage is call optimitist update, another methoid to use is update http first
+      setUserPlaces(userPlaces);
+      setErrorUpdatingPlaces({
+        message: error.message || "failed to update places",
+      });
+    }
   }
 
   const handleRemovePlace = useCallback(async function handleRemovePlace() {
@@ -47,8 +63,21 @@ function App() {
     setModalIsOpen(false);
   }, []);
 
+  function handleError() {
+    setErrorUpdatingPlaces(null);
+  }
+
   return (
     <>
+      <Modal open={errorUpdatingPlaces} onClose={handleError}>
+        {errorUpdatingPlaces && (
+          <Error
+            title="An error occurred"
+            message={errorUpdatingPlaces.message}
+            onConfirm={handleError}
+          />
+        )}
+      </Modal>
       <Modal open={modalIsOpen} onClose={handleStopRemovePlace}>
         <DeleteConfirmation
           onCancel={handleStopRemovePlace}
